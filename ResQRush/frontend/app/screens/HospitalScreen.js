@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -8,7 +8,7 @@ import {
   Alert,
   ScrollView,
   ActivityIndicator,
-} from 'react-native';
+} from "react-native";
 import {
   collection,
   onSnapshot,
@@ -17,24 +17,25 @@ import {
   getDoc,
   query,
   where,
-} from 'firebase/firestore';
-import { db } from '../firebase/firebaseConnection';
-import { useNavigation } from '@react-navigation/native';
-import { auth } from '../firebase/firebaseConnection';
+} from "firebase/firestore";
+import { db } from "../firebase/firebaseConnection";
+import { useNavigation } from "@react-navigation/native";
+import { auth } from "../firebase/firebaseConnection";
 import app from "../firebase/firebaseConnection";
 import { getAuth, signOut } from "firebase/auth";
 import { MaterialIcons, FontAwesome5 } from "@expo/vector-icons";
-import { LinearGradient } from 'expo-linear-gradient';
+import { LinearGradient } from "expo-linear-gradient";
 
 const HospitalScreen = ({ route }) => {
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [showRequestModal, setShowRequestModal] = useState(false);
   const [hospitalLocation, setHospitalLocation] = useState(null);
-  const [hospitalName, setHospitalName] = useState('');
+  const [hospitalName, setHospitalName] = useState("");
   const [hospitalId, setHospitalId] = useState(null);
   const [pendingRequests, setPendingRequests] = useState([]);
   const [acceptedRequests, setAcceptedRequests] = useState([]);
-  const [showNavigationForPatient, setShowNavigationForPatient] = useState(null);
+  const [showNavigationForPatient, setShowNavigationForPatient] =
+    useState(null);
   const [loading, setLoading] = useState(true);
   const navigation = useNavigation();
 
@@ -42,7 +43,7 @@ const HospitalScreen = ({ route }) => {
     const fetchHospitalId = async () => {
       const user = auth.currentUser;
       if (user) {
-        const userRef = doc(db, 'users', user.uid);
+        const userRef = doc(db, "users", user.uid);
         const userDoc = await getDoc(userRef);
 
         if (userDoc.exists()) {
@@ -50,11 +51,11 @@ const HospitalScreen = ({ route }) => {
           setHospitalId(data.hospitalId);
           fetchHospitalDetails(data.hospitalId);
         } else {
-          console.error('User not found:', user.uid);
+          console.error("User not found:", user.uid);
           setLoading(false);
         }
       } else {
-        console.error('User is not logged in');
+        console.error("User is not logged in");
         setLoading(false);
       }
     };
@@ -83,9 +84,9 @@ const HospitalScreen = ({ route }) => {
 
     const unsubscribe = onSnapshot(
       query(
-        collection(db, 'incidents'),
-        where('hospitalInfo.id', '==', hospitalId),
-        where('status.hospital', 'in', ['requested', 'accepted'])
+        collection(db, "incidents"),
+        where("hospitalInfo.id", "==", hospitalId),
+        where("status.hospital", "in", ["requested", "accepted"])
       ),
       (snapshot) => {
         const pending = [];
@@ -93,23 +94,23 @@ const HospitalScreen = ({ route }) => {
 
         snapshot.forEach((doc) => {
           const data = doc.data();
-          if (data.status.hospital === 'requested') {
+          if (data.status.hospital === "requested") {
             pending.push({
               id: doc.id,
               ...data,
-              patientName: data.patientInfo?.name || 'Unknown',
-              patientCondition: data.patientInfo?.condition || 'Not specified',
-              patientAge: data.patientInfo?.age || 'Not specified',
-              driverId: data.assignedTo
+              incidentType: data.incidentType || "Unknown",
+              conditionType: data.conditionType || "Unknown",
+              description: data.description || "Unknown",
+              driverId: data.assignedTo,
             });
-          } else if (data.status.hospital === 'accepted') {
+          } else if (data.status.hospital === "accepted") {
             accepted.push({
               id: doc.id,
               ...data,
-              patientName: data.patientInfo?.name || 'Unknown',
-              patientCondition: data.patientInfo?.condition || 'Not specified',
-              patientAge: data.patientInfo?.age || 'Not specified',
-              driverId: data.assignedTo
+              incidentType: data.incidentType || "Unknown",
+              conditionType: data.conditionType || "Unknown",
+              description: data.description || "Unknown",
+              driverId: data.assignedTo,
             });
           }
         });
@@ -125,94 +126,102 @@ const HospitalScreen = ({ route }) => {
 
   const fetchHospitalDetails = async (hospitalId) => {
     if (!hospitalId) {
-      console.error('Hospital ID is missing');
+      console.error("Hospital ID is missing");
       return;
     }
 
     try {
-      const hospitalRef = doc(db, 'hospitals', hospitalId);
+      const hospitalRef = doc(db, "hospitals", hospitalId);
       const hospitalDoc = await getDoc(hospitalRef);
 
       if (hospitalDoc.exists()) {
         const data = hospitalDoc.data();
         if (!data.latitude || !data.longitude) {
-          throw new Error('Hospital location data is incomplete');
+          throw new Error("Hospital location data is incomplete");
         }
         setHospitalLocation({
           latitude: data.latitude,
-          longitude: data.longitude
+          longitude: data.longitude,
         });
         setHospitalName(data.name);
       } else {
-        console.error('Hospital not found:', hospitalId);
+        console.error("Hospital not found:", hospitalId);
       }
     } catch (error) {
-      console.error('Error fetching hospital details:', error);
-      Alert.alert('Error', 'Failed to load hospital location data');
+      console.error("Error fetching hospital details:", error);
+      Alert.alert("Error", "Failed to load hospital location data");
     }
   };
 
   const handleResponse = async (response, requestId) => {
     try {
       if (!requestId) {
-        console.error('Request ID is missing');
+        console.error("Request ID is missing");
         return;
       }
 
-      const incidentRef = doc(db, 'incidents', requestId);
+      const incidentRef = doc(db, "incidents", requestId);
       await updateDoc(incidentRef, {
-        'status.hospital': response ? 'accepted' : 'rejected',
-        hospitalRespondedAt: new Date().toISOString()
+        "status.hospital": response ? "accepted" : "rejected",
+        hospitalRespondedAt: new Date().toISOString(),
       });
 
       setShowRequestModal(false);
 
       if (response) {
         // Find the accepted request
-        const acceptedRequest = pendingRequests.find(req => req.id === requestId);
+        const acceptedRequest = pendingRequests.find(
+          (req) => req.id === requestId
+        );
         if (acceptedRequest && hospitalLocation) {
-          navigation.navigate('HospitalNavigation', {
+          navigation.navigate("HospitalNavigation", {
             driverLocation: {
               latitude: acceptedRequest.latitude,
               longitude: acceptedRequest.longitude,
-              driverId: acceptedRequest.driverId
+              driverId: acceptedRequest.driverId,
             },
             hospitalLocation: hospitalLocation,
             hospitalName: hospitalName,
-            incidentId: requestId
+            incidentId: requestId,
           });
         }
       }
     } catch (error) {
-      console.error('Error updating request:', error);
-      Alert.alert('Error', 'Failed to update request status.');
+      console.error("Error updating request:", error);
+      Alert.alert("Error", "Failed to update request status.");
     }
   };
 
   const handleShowNavigation = (requestId) => {
-    setShowNavigationForPatient(requestId === showNavigationForPatient ? null : requestId);
+    setShowNavigationForPatient(
+      requestId === showNavigationForPatient ? null : requestId
+    );
   };
 
   const navigateToHospitalNavigation = (request) => {
-    if (!hospitalLocation || !hospitalLocation.latitude || !hospitalLocation.longitude) {
-      Alert.alert('Error', 'Hospital location data is missing');
+    if (
+      !hospitalLocation ||
+      !hospitalLocation.latitude ||
+      !hospitalLocation.longitude
+    ) {
+      Alert.alert("Error", "Hospital location data is missing");
       return;
     }
 
     if (!request.latitude || !request.longitude) {
-      Alert.alert('Error', 'Driver location data is missing');
+      Alert.alert("Error", "Driver location data is missing");
       return;
     }
 
-    navigation.navigate('HospitalNavigation', {
+    navigation.navigate("HospitalNavigation", {
       driverLocation: {
         latitude: request.latitude,
         longitude: request.longitude,
-        driverId: request.driverId
+        driverId: request.driverId,
       },
       hospitalLocation: hospitalLocation,
       hospitalName: hospitalName,
-      incidentId: request.id
+      incidentId: request.id,
     });
   };
 
@@ -239,9 +248,9 @@ const HospitalScreen = ({ route }) => {
                 setShowRequestModal(true);
               }}
             >
-              <Text style={styles.patientName}>{request.patientName}</Text>
-              <Text style={styles.patientDetails}>Condition: {request.patientCondition}</Text>
-              <Text style={styles.patientDetails}>Age: {request.patientAge}</Text>
+              <Text style={styles.patientName}>{request.incidentType}</Text>
+              <Text style={styles.patientDetails}>Condition: {request.conditionType}</Text>
+              <Text style={styles.patientDetails}>Description: {request.description}</Text>
             </TouchableOpacity>
           ))
         ) : (
@@ -252,15 +261,17 @@ const HospitalScreen = ({ route }) => {
         {acceptedRequests.length > 0 ? (
           acceptedRequests.map((request) => (
             <View key={request.id} style={styles.requestItem}>
-              <Text style={styles.patientName}>{request.patientName}</Text>
-              <Text style={styles.patientDetails}>Condition: {request.patientCondition}</Text>
-              <Text style={styles.patientDetails}>Age: {request.patientAge}</Text>
+              <Text style={styles.patientName}>{request.incidentType}</Text>
+              <Text style={styles.patientDetails}>Condition: {request.conditionType}</Text>
+              <Text style={styles.patientDetails}>Description: {request.description}</Text>
               <TouchableOpacity
                 style={styles.showNavigationButton}
                 onPress={() => handleShowNavigation(request.id)}
               >
                 <Text style={styles.showNavigationButtonText}>
-                  {showNavigationForPatient === request.id ? "Hide Navigation" : "Show Navigation"}
+                  {showNavigationForPatient === request.id
+                    ? "Hide Navigation"
+                    : "Show Navigation"}
                 </Text>
               </TouchableOpacity>
               {showNavigationForPatient === request.id && (
@@ -268,7 +279,9 @@ const HospitalScreen = ({ route }) => {
                   style={styles.navigateButton}
                   onPress={() => navigateToHospitalNavigation(request)}
                 >
-                  <Text style={styles.navigateButtonText}>Navigate to Patient</Text>
+                  <Text style={styles.navigateButtonText}>
+                    Navigate to Patient
+                  </Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -282,11 +295,23 @@ const HospitalScreen = ({ route }) => {
         <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Patient Details</Text>
+            {/* <TouchableOpacity
+              style={[styles.modalButton, styles.closeButton]}
+              onPress={() => setShowRequestModal(false)}
+            >
+              <Text style={styles.modalButtonText}>X</Text>
+            </TouchableOpacity> */}
             {selectedRequest && (
               <>
-                <Text style={styles.modalText}>Name: {selectedRequest.patientName}</Text>
-                <Text style={styles.modalText}>Condition: {selectedRequest.patientCondition}</Text>
-                <Text style={styles.modalText}>Age: {selectedRequest.patientAge}</Text>
+                <Text style={styles.modalText}>
+                  Incident Type: {selectedRequest.incidentType}
+                </Text>
+                <Text style={styles.modalText}>
+                  Condition: {selectedRequest.conditionType}
+                </Text>
+                <Text style={styles.modalText}>
+                  Description: {selectedRequest.description}
+                </Text>
               </>
             )}
             <View style={styles.modalButtons}>
@@ -313,19 +338,19 @@ const HospitalScreen = ({ route }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: "#f5f5f5",
   },
   header: {
     padding: 20,
     borderBottomLeftRadius: 20,
     borderBottomRightRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   headerText: {
     fontSize: 24,
-    fontWeight: 'bold',
-    color: '#fff',
+    fontWeight: "bold",
+    color: "#fff",
   },
   requestsContainer: {
     flex: 1,
@@ -333,16 +358,16 @@ const styles = StyleSheet.create({
   },
   sectionHeader: {
     fontSize: 20,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     marginBottom: 10,
-    color: '#333',
+    color: "#333",
   },
   requestItem: {
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     padding: 15,
     borderRadius: 10,
     marginBottom: 10,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
@@ -350,99 +375,104 @@ const styles = StyleSheet.create({
   },
   patientName: {
     fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
+    fontWeight: "bold",
+    color: "#333",
   },
   patientDetails: {
     fontSize: 14,
-    color: '#555',
+    color: "#555",
     marginTop: 5,
   },
   noRequestsText: {
-    textAlign: 'center',
-    color: '#888',
+    textAlign: "center",
+    color: "#888",
     marginVertical: 10,
   },
   showNavigationButton: {
-    backgroundColor: '#4285F4',
+    backgroundColor: "#4285F4",
     padding: 10,
     borderRadius: 5,
     marginTop: 10,
-    alignItems: 'center',
+    alignItems: "center",
   },
   showNavigationButtonText: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: "bold",
   },
   navigateButton: {
-    backgroundColor: '#34A853',
+    backgroundColor: "#34A853",
     padding: 10,
     borderRadius: 5,
     marginTop: 10,
-    alignItems: 'center',
+    alignItems: "center",
   },
   navigateButtonText: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: "bold",
   },
   modalContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
   },
   modalContent: {
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     padding: 20,
     borderRadius: 10,
-    width: '80%',
+    width: "80%",
   },
   modalTitle: {
     fontSize: 20,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     marginBottom: 10,
-    color: '#333',
-    textAlign: 'center',
+    color: "#333",
+    textAlign: "center",
   },
   modalText: {
     fontSize: 16,
-    color: '#555',
+    color: "#555",
     marginBottom: 10,
-    textAlign: 'center',
+    textAlign: "center",
   },
   modalButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
+    flexDirection: "row",
+    justifyContent: "space-around",
     marginTop: 20,
   },
   modalButton: {
     padding: 10,
     borderRadius: 5,
-    width: '40%',
-    alignItems: 'center',
+    width: "40%",
+    alignItems: "center",
   },
   acceptButton: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: "#4CAF50",
   },
   rejectButton: {
-    backgroundColor: '#F44336',
+    backgroundColor: "#F44336",
   },
   modalButtonText: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: "bold",
   },
   loadingContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   loadingText: {
     marginTop: 10,
     fontSize: 16,
-    color: '#333',
+    color: "#333",
+  },
+  closeButton: {
+    backgroundColor: "#888",
+    marginTop: 10,
+    alignSelf: "center",
   },
 });
 
