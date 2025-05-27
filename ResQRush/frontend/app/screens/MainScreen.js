@@ -133,7 +133,7 @@
 // export default MainScreen;
 
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Dimensions } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Dimensions, StatusBar } from 'react-native';
 import Svg, { Path, Defs, LinearGradient, Stop } from 'react-native-svg';
 import LottieView from 'lottie-react-native';
 
@@ -142,6 +142,7 @@ const { height, width } = Dimensions.get('window');
 const MainScreen = ({ navigation }) => {
   return (
     <View style={styles.container}>
+      <StatusBar barStyle="light-content" backgroundColor="#ef4444" />
       {/* Background Wave Pattern */}
       <Svg style={styles.svg} viewBox="0 0 100 100" preserveAspectRatio="none">
         <Defs>

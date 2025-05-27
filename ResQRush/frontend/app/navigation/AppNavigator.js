@@ -37,7 +37,7 @@ const AppNavigator = () => {
         component={DriverScreen}
         options={{
           headerShown: true,
-          title: 'Ambulance',
+          title: 'Driver Screen',
           headerStyle: {
             backgroundColor: '#3b5998',
           },
@@ -52,7 +52,7 @@ const AppNavigator = () => {
         component={HospitalScreen}
         options={{
           headerShown: true,
-          title: 'Ambulance',
+          title: 'Hospital Screen',
           headerStyle: {
             backgroundColor: '#388E3C',
           },

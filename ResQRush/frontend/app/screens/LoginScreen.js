@@ -274,8 +274,9 @@
 import React, { useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator,
-  Modal
+  Modal,StatusBar
 } from 'react-native';
+import Icon from 'react-native-vector-icons/FontAwesome';
 import { auth, db } from '../firebase/firebaseConnection';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { collection, query, where, getDocs } from 'firebase/firestore';
@@ -284,6 +285,11 @@ const LoginScreen = ({ navigation }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+
+  const togglePasswordVisibility = () => {
+    setShowPassword(!showPassword);
+  };
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -338,23 +344,21 @@ const LoginScreen = ({ navigation }) => {
           ]);
         } else {
           setLoading(false);
-          console.log('Role field is missing:', userData);
           Alert.alert('Error', 'User role not found in Firestore.');
         }
       } else {
         setLoading(false);
-        console.log('No matching user document found.');
         Alert.alert('Error', 'User data not found.');
       }
     } catch (error) {
       setLoading(false);
-      console.error('Login error:', error);
-      Alert.alert('Error', error.message);
+      Alert.alert('Invalid email or password', 'Check the credentials properly');
     }
   };
 
   return (
     <View style={styles.container}>
+      <StatusBar barStyle="light-content" backgroundColor="#f5f5f5" />
       <Text style={styles.title}>Login</Text>
       <TextInput
         style={styles.input}
@@ -364,13 +368,25 @@ const LoginScreen = ({ navigation }) => {
         value={email}
         onChangeText={setEmail}
       />
-      <TextInput
-        style={styles.input}
-        placeholder="Password"
-        secureTextEntry
-        value={password}
-        onChangeText={setPassword}
-      />
+      <View style={styles.passwordContainer}>
+        <TextInput
+          style={styles.passwordInput}
+          placeholder="Password"
+          secureTextEntry={!showPassword}
+          value={password}
+          onChangeText={setPassword}
+        />
+        <TouchableOpacity 
+          style={styles.eyeButton} 
+          onPress={togglePasswordVisibility}
+        >
+          <Icon 
+            name={showPassword ? 'eye-slash' : 'eye'} 
+            size={20} 
+            color="#666" 
+          />
+        </TouchableOpacity>
+      </View>
       <TouchableOpacity style={styles.button} onPress={handleLogin}>
         <Text style={styles.buttonText}>Login</Text>
       </TouchableOpacity>
@@ -379,13 +395,13 @@ const LoginScreen = ({ navigation }) => {
       </TouchableOpacity>
 
       <Modal transparent={true} animationType="fade" visible={loading}>
-  <View style={styles.loadingOverlay}>
-    <View style={styles.spinnerContent}>
-      <ActivityIndicator size="large" color="#ef4444" />
-      <Text style={styles.loadingText}>Logging you in...</Text>
-    </View>
-  </View>
-</Modal>
+        <View style={styles.loadingOverlay}>
+          <View style={styles.spinnerContent}>
+            <ActivityIndicator size="large" color="#ef4444" />
+            <Text style={styles.loadingText}>Logging you in...</Text>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -396,28 +412,56 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
+    backgroundColor: '#f5f5f5',
   },
   title: {
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: 'bold',
-    marginBottom: 20,
+    marginBottom: 30,
+    color: '#333',
   },
   input: {
     width: '100%',
-    height: 40,
-    borderColor: '#ccc',
+    height: 50,
+    borderColor: '#ddd',
     borderWidth: 1,
-    borderRadius: 5,
-    paddingHorizontal: 10,
-    marginBottom: 15,
+    borderRadius: 8,
+    paddingHorizontal: 15,
+    marginBottom: 20,
+    backgroundColor: '#fff',
+    fontSize: 16,
+  },
+  passwordContainer: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderColor: '#ddd',
+    borderWidth: 1,
+    borderRadius: 8,
+    marginBottom: 20,
+    backgroundColor: '#fff',
+  },
+  passwordInput: {
+    flex: 1,
+    height: 50,
+    paddingHorizontal: 15,
+    fontSize: 16,
+  },
+  eyeButton: {
+    padding: 15,
   },
   button: {
     backgroundColor: '#ef4444',
     paddingVertical: 15,
-    paddingHorizontal: 30,
-    borderRadius: 12,
+    borderRadius: 8,
     width: '100%',
     alignItems: 'center',
+    marginTop: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
   },
   buttonText: {
     color: 'white',
@@ -425,29 +469,31 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   link: {
-    marginTop: 15,
+    marginTop: 20,
     color: '#ef4444',
     fontSize: 16,
+    fontWeight: '500',
   },
   loadingOverlay: {
-  flex: 1,
-  backgroundColor: 'rgba(0,0,0,0.3)',
-  justifyContent: 'center',
-  alignItems: 'center',
-},
-spinnerContent: {
-  backgroundColor: 'white',
-  padding: 25,
-  borderRadius: 10,
-  alignItems: 'center',
-  elevation: 5,
-},
-loadingText: {
-  marginTop: 10,
-  fontSize: 16,
-  color: '#333',
-},
-
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  spinnerContent: {
+    backgroundColor: 'white',
+    padding: 25,
+    borderRadius: 10,
+    alignItems: 'center',
+    elevation: 5,
+    width: '80%',
+  },
+  loadingText: {
+    marginTop: 15,
+    fontSize: 16,
+    color: '#333',
+    fontWeight: '500',
+  },
 });
 
 export default LoginScreen;

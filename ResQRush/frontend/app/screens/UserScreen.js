@@ -10,6 +10,7 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
+  StatusBar
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialIcons, FontAwesome5 } from "@expo/vector-icons";
@@ -154,7 +155,7 @@ const UserScreen = ({ navigation }) => {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       style={styles.container}
     >
-
+      <StatusBar barStyle="light-content" backgroundColor="#3b5998"/>
       <ScrollView contentContainerStyle={styles.scrollContainer}>
         <View style={styles.formContainer}>
           {/* Location Display */}
