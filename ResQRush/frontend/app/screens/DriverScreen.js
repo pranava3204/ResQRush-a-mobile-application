@@ -170,7 +170,6 @@
 //     });
 //   }, [navigation]);
 
-
 //   const handleAcceptIncident = async () => {
 //     if (!auth.currentUser?.uid || !driverData.name) {
 //       Alert.alert('Error', 'Driver information incomplete');
@@ -290,7 +289,6 @@
 //     );
 //   }
 
-
 //   return (
 //     <ScrollView contentContainerStyle={styles.container}>
 
@@ -357,7 +355,6 @@
 //               </View>
 //             </View>
 //           </Modal>
-
 
 //           {driverLocation && assignedIncident.latitude && assignedIncident.longitude && (
 //             <View style={styles.mapContainer}>
@@ -501,7 +498,7 @@
 //     </ScrollView>
 
 //   )
-  
+
 // }
 
 // const styles = StyleSheet.create({
@@ -759,13 +756,639 @@
 //     fontWeight: '600',
 //   },
 
-
-
 // });
 
 // export default DriverScreen;
 
-import React, { useState, useEffect, useLayoutEffect } from 'react';
+// import React, { useState, useEffect, useLayoutEffect } from 'react';
+// import {
+//   View,
+//   Text,
+//   StyleSheet,
+//   TouchableOpacity,
+//   ScrollView,
+//   ActivityIndicator,
+//   Alert,
+//   Modal,
+//   StatusBar
+// } from 'react-native';
+// import { LinearGradient } from 'expo-linear-gradient';
+// import { db, auth } from '../firebase/firebaseConnection';
+// import app from "../firebase/firebaseConnection";
+// import { getAuth, signOut } from "firebase/auth";
+// import { doc, updateDoc, onSnapshot, collection, query, where, getDocs, getDoc } from 'firebase/firestore';
+// import MapView, { Marker } from 'react-native-maps';
+// import { MaterialIcons, FontAwesome5 } from '@expo/vector-icons';
+// import * as Location from 'expo-location';
+
+// const DriverScreen = ({ navigation }) => {
+//   const [assignedIncident, setAssignedIncident] = useState(null);
+//   const [driverLocation, setDriverLocation] = useState(null);
+//   const [loading, setLoading] = useState(true);
+//   const [showAcceptModal, setShowAcceptModal] = useState(false);
+//   const [showNavigation, setShowNavigation] = useState(false);
+//   const [showHospitalNavigation, setShowHospitalNavigation] = useState(false);
+//   const [driverData, setDriverData] = useState({
+//     name: '',
+//     vehicleNumber: '',
+//     contact: '',
+//     email: ''
+//   });
+//   const [showDetailsModal, setShowDetailsModal] = useState(false);
+
+//   useEffect(() => {
+//     const user = auth.currentUser;
+//     if (!user) {
+//       Alert.alert('Error', 'Driver not authenticated');
+//       navigation.navigate('Login');
+//       return;
+//     }
+
+//     let interval = null;
+//     let unsubscribe = null;
+
+//     const fetchAndStoreLocation = async () => {
+//       try {
+//         let { status } = await Location.requestForegroundPermissionsAsync();
+//         if (status !== 'granted') {
+//           Alert.alert('Permission Denied', 'Allow location access to use this feature.');
+//           return;
+//         }
+
+//         let location = await Location.getCurrentPositionAsync({});
+//         const userDoc = await getDoc(doc(db, 'users', user.uid));
+//         const ambulanceDoc = await getDoc(doc(db, 'ambulances', user.uid));
+//         const { latitude, longitude } = location.coords;
+
+//         if (userDoc.exists() && ambulanceDoc.exists()) {
+//           const userData = userDoc.data();
+//           const ambulanceData = ambulanceDoc.data();
+
+//           setDriverData({
+//             name: userData.name || 'Driver',
+//             vehicleNumber: ambulanceData.vehicleNumber || 'Unknown',
+//             contact: ambulanceData.contact || 'N/A',
+//             email: userData.email
+//           });
+//         } else {
+//           Alert.alert('Error', 'Driver profile not complete');
+//         }
+
+//         const driverRef = doc(db, 'ambulances', auth.currentUser.uid);
+//         await updateDoc(driverRef, {
+//           latitude,
+//           longitude,
+//           timestamp: new Date().toISOString(),
+//         });
+
+//         setDriverLocation({
+//           latitude,
+//           longitude,
+//           driverId: auth.currentUser.uid,
+//         });
+//       } catch (error) {
+//         console.error('Location update error:', error);
+//       }
+//     };
+
+//     interval = setInterval(fetchAndStoreLocation, 20000);
+//     fetchAndStoreLocation(); // Initial fetch
+
+//     const fetchAssignedIncidents = () => {
+//       const incidentsRef = collection(db, 'incidents');
+
+//       // Query for incidents assigned to this driver where hospital is not completed
+//       const q = query(
+//         incidentsRef,
+//         where('assignedTo', '==', user.uid),
+//         where('status.hospital', '!=', 'completed')
+//       );
+
+//       unsubscribe = onSnapshot(q, (snapshot) => {
+//         if (!snapshot.empty) {
+//           const incidentDoc = snapshot.docs[0];
+//           const incidentData = incidentDoc.data();
+//           const newIncident = {
+//             id: incidentDoc.id,
+//             ...incidentData
+//           };
+//           setAssignedIncident(newIncident);
+
+//           // Determine which screen to show based on incident status
+//           if (incidentData.status?.driver === 'completed' && incidentData.status?.hospital === 'accepted') {
+//             // Show hospital navigation if driver completed but hospital not completed
+//             setShowNavigation(false);
+//             setShowHospitalNavigation(true);
+//           } else if (incidentData.status?.driver === 'accepted') {
+//             // Show incident navigation if driver accepted but not completed
+//             setShowNavigation(true);
+//             setShowHospitalNavigation(false);
+//           } else {
+//             // Show accept screen for new assignments
+//             setShowNavigation(false);
+//             setShowHospitalNavigation(false);
+//           }
+//         } else {
+//           // Check for new available incidents if no assigned incidents
+//           const availableIncidentsQuery = query(
+//             incidentsRef,
+//             where('status.driver', '==', 'assigned'),
+//             where('availableToAllDrivers', '==', true)
+//           );
+
+//           getDocs(availableIncidentsQuery).then((availableSnapshot) => {
+//             if (!availableSnapshot.empty) {
+//               const incidentDoc = availableSnapshot.docs[0];
+//               const incidentData = incidentDoc.data();
+//               setAssignedIncident({
+//                 id: incidentDoc.id,
+//                 ...incidentData
+//               });
+//               setShowNavigation(false);
+//               setShowHospitalNavigation(false);
+//             } else {
+//               setAssignedIncident(null);
+//               setShowNavigation(false);
+//               setShowHospitalNavigation(false);
+//             }
+//           });
+//         }
+//         setLoading(false);
+//       });
+//     };
+
+//     fetchAssignedIncidents();
+
+//     return () => {
+//       if (interval) clearInterval(interval);
+//       if (unsubscribe) unsubscribe();
+//     };
+//   }, [navigation]);
+
+//   const handleLogout = async () => {
+//     try {
+//       const auth = getAuth(app);
+//       await signOut(auth);
+//       navigation.replace("Login");
+//       console.log("User logged out");
+//     } catch (error) {
+//       Alert.alert("Logout Error", error.message);
+//     }
+//   };
+
+//   useLayoutEffect(() => {
+//     navigation.setOptions({
+//       headerRight: () => (
+//         <TouchableOpacity onPress={handleLogout} style={{ marginRight: 15 }}>
+//           <FontAwesome5 name="sign-out-alt" size={24} color={"#ffffff"} />
+//         </TouchableOpacity>
+//       ),
+//     });
+//   }, [navigation]);
+
+//   const handleAcceptIncident = async () => {
+//     if (!auth.currentUser?.uid || !driverData.name) {
+//       Alert.alert('Error', 'Driver information incomplete');
+//       return;
+//     }
+
+//     try {
+//       setLoading(true);
+
+//       const driverInfo = {
+//         name: driverData.name,
+//         vehicleNumber: driverData.vehicleNumber,
+//         contact: driverData.contact,
+//         email: driverData.email
+//       };
+
+//       const incidentRef = doc(db, 'incidents', assignedIncident.id);
+//       await updateDoc(incidentRef, {
+//         'status.driver': 'accepted',
+//         assignedTo: auth.currentUser.uid,
+//         acceptedAt: new Date().toISOString(),
+//         driverInfo: driverInfo,
+//         availableToAllDrivers: false
+//       });
+
+//       await updateDoc(doc(db, 'ambulances', auth.currentUser.uid), {
+//         status: 'busy',
+//         lastUpdated: new Date().toISOString()
+//       });
+
+//       setShowAcceptModal(false);
+//       setShowNavigation(true);
+//     } catch (error) {
+//       console.error('Error accepting incident:', error);
+//       Alert.alert('Error', 'Failed to accept incident');
+//     } finally {
+//       setLoading(false);
+//     }
+//   };
+
+//   const handleStartNavigation = () => {
+//     if (!driverLocation || !driverLocation.latitude || !driverLocation.longitude) {
+//       Alert.alert('Error', 'Driver location data not available');
+//       return;
+//     }
+
+//     if (!assignedIncident || !assignedIncident.latitude || !assignedIncident.longitude) {
+//       Alert.alert('Error', 'Incident location data not available');
+//       return;
+//     }
+
+//     navigation.navigate('DriverNavigation', {
+//       driverLocation: {
+//         latitude: driverLocation.latitude,
+//         longitude: driverLocation.longitude,
+//         driverId: driverLocation.driverId
+//       },
+//       destinationLocation: {
+//         latitude: assignedIncident.latitude,
+//         longitude: assignedIncident.longitude,
+//         address: assignedIncident.address,
+//         type: 'incident'
+//       },
+//       incidentType: assignedIncident.incidentType,
+//       incidentId: assignedIncident.id,
+//       isHospitalNavigation: false
+//     });
+//   };
+
+//   const handleStartHospitalNavigation = () => {
+//     if (!driverLocation || !driverLocation.latitude || !driverLocation.longitude) {
+//       Alert.alert('Error', 'Driver location data not available');
+//       return;
+//     }
+
+//     if (!assignedIncident.hospitalInfo || !assignedIncident.hospitalInfo.latitude || !assignedIncident.hospitalInfo.longitude) {
+//       Alert.alert('Error', 'Hospital location data not available');
+//       return;
+//     }
+
+//     navigation.navigate('DriverNavigation', {
+//       driverLocation: {
+//         latitude: driverLocation.latitude,
+//         longitude: driverLocation.longitude,
+//         driverId: driverLocation.driverId
+//       },
+//       destinationLocation: {
+//         latitude: assignedIncident.hospitalInfo.latitude,
+//         longitude: assignedIncident.hospitalInfo.longitude,
+//         address: assignedIncident.hospitalInfo.address,
+//         type: 'hospital'
+//       },
+//       incidentType: assignedIncident.incidentType,
+//       incidentId: assignedIncident.id,
+//       isHospitalNavigation: true
+//     });
+//   };
+
+//   const handleCompleteIncident = async () => {
+//     try {
+//       setLoading(true);
+
+//       const incidentRef = doc(db, 'incidents', assignedIncident.id);
+//       await updateDoc(incidentRef, {
+//         'status.driver': 'completed',
+//         completedAt: new Date().toISOString()
+//       });
+
+//       await updateDoc(doc(db, 'ambulances', auth.currentUser.uid), {
+//         status: 'available',
+//         lastUpdated: new Date().toISOString()
+//       });
+
+//       // Navigate to the HospitalSelectionScreen with incident details
+//       navigation.navigate('HospitalSelection', {
+//         incidentId: assignedIncident.id,
+//         incidentDetails: {
+//           type: assignedIncident.incidentType,
+//           description: assignedIncident.description,
+//           address: assignedIncident.address,
+//           patientInfo: assignedIncident.patientInfo || {}
+//         },
+//         driverLocation: {
+//           latitude: driverLocation.latitude,
+//           longitude: driverLocation.longitude,
+//           driverId: driverLocation.driverId
+//         }
+//       });
+
+//       setAssignedIncident(null);
+//       setShowNavigation(false);
+//     } catch (error) {
+//       console.error('Error completing incident:', error);
+//       Alert.alert('Error', 'Failed to complete incident');
+//     } finally {
+//       setLoading(false);
+//     }
+//   };
+
+//   const handleCompleteHospitalTrip = async () => {
+//     try {
+//       setLoading(true);
+
+//       const incidentRef = doc(db, 'incidents', assignedIncident.id);
+//       await updateDoc(incidentRef, {
+//         'status.hospital': 'completed',
+//         hospitalCompletedAt: new Date().toISOString()
+//       });
+
+//       await updateDoc(doc(db, 'ambulances', auth.currentUser.uid), {
+//         status: 'available',
+//         lastUpdated: new Date().toISOString()
+//       });
+
+//       setAssignedIncident(null);
+//       setShowHospitalNavigation(false);
+//       Alert.alert('Success', 'Hospital trip completed successfully');
+//     } catch (error) {
+//       console.error('Error completing hospital trip:', error);
+//       Alert.alert('Error', 'Failed to complete hospital trip');
+//     } finally {
+//       setLoading(false);
+//     }
+//   };
+
+//   if (loading) {
+//     return (
+//       <View style={styles.loadingContainer}>
+//         <ActivityIndicator size="large" color="#4285F4" />
+//         <Text style={styles.loadingText}>Loading...</Text>
+//       </View>
+//     );
+//   }
+
+//   return (
+//     <ScrollView contentContainerStyle={styles.container}>
+//       <StatusBar barStyle="light-content" backgroundColor="#3b5998"/>
+//       {!assignedIncident ? (
+//         <View style={styles.emptyState}>
+//           <MaterialIcons name="assignment" size={60} color="#bbb" />
+//           <Text style={styles.noDataText}>No assigned incidents</Text>
+//           <Text style={styles.subText}>Waiting for new assignments...</Text>
+//         </View>
+//       ) : showHospitalNavigation ? (
+//         <>
+//           <View style={styles.navigationContainer}>
+//             <Text style={styles.navigationTitle}>Hospital Trip</Text>
+//             <Text style={styles.navigationText}>Transporting patient to:</Text>
+//             <Text style={styles.hospitalName}>{assignedIncident.hospitalInfo?.name}</Text>
+//             <Text style={styles.address}>{assignedIncident.hospitalInfo?.address}</Text>
+
+//             {driverLocation && assignedIncident.hospitalInfo?.latitude && assignedIncident.hospitalInfo?.longitude && (
+//               <View style={styles.mapContainer}>
+//                 <MapView
+//                   style={styles.map}
+//                   initialRegion={{
+//                     latitude: driverLocation.latitude,
+//                     longitude: driverLocation.longitude,
+//                     latitudeDelta: 0.06,
+//                     longitudeDelta: 0.03,
+//                   }}
+//                 >
+//                   <Marker
+//                     coordinate={{
+//                       latitude: driverLocation.latitude,
+//                       longitude: driverLocation.longitude,
+//                     }}
+//                     title="Your Location"
+//                     pinColor="blue"
+//                   />
+//                   <Marker
+//                     coordinate={{
+//                       latitude: assignedIncident.hospitalInfo.latitude,
+//                       longitude: assignedIncident.hospitalInfo.longitude,
+//                     }}
+//                     title="Hospital Location"
+//                     pinColor="green"
+//                   />
+//                 </MapView>
+//               </View>
+//             )}
+
+//             <TouchableOpacity
+//               style={[styles.button, styles.navigateButton]}
+//               onPress={handleStartHospitalNavigation}
+//               activeOpacity={0.8}
+//             >
+//               <Text style={styles.buttonText}>Navigate to Hospital</Text>
+//             </TouchableOpacity>
+
+//             <TouchableOpacity
+//               style={[styles.button, styles.completeButton]}
+//               onPress={handleCompleteHospitalTrip}
+//               activeOpacity={0.8}
+//             >
+//               <Text style={styles.buttonText}>Complete Hospital Trip</Text>
+//             </TouchableOpacity>
+//           </View>
+//         </>
+//       ) : showNavigation ? (
+//         <>
+//           <View style={styles.navigationContainer}>
+//             <Text style={styles.navigationTitle}>Active Incident</Text>
+//             <Text style={styles.navigationText}>{assignedIncident.incidentType}</Text>
+//             <Text style={styles.address}>{assignedIncident.address}</Text>
+
+//             {driverLocation && assignedIncident.latitude && assignedIncident.longitude && (
+//               <View style={styles.mapContainer}>
+//                 <MapView
+//                   style={styles.map}
+//                   initialRegion={{
+//                     latitude: driverLocation.latitude,
+//                     longitude: driverLocation.longitude,
+//                     latitudeDelta: 0.06,
+//                     longitudeDelta: 0.03,
+//                   }}
+//                 >
+//                   <Marker
+//                     coordinate={{
+//                       latitude: driverLocation.latitude,
+//                       longitude: driverLocation.longitude,
+//                     }}
+//                     title="Your Location"
+//                     pinColor="blue"
+//                   />
+//                   <Marker
+//                     coordinate={{
+//                       latitude: assignedIncident.latitude,
+//                       longitude: assignedIncident.longitude,
+//                     }}
+//                     title="Incident Location"
+//                     pinColor="red"
+//                   />
+//                 </MapView>
+//               </View>
+//             )}
+
+//             <TouchableOpacity
+//               style={[styles.button, styles.navigateButton]}
+//               onPress={handleStartNavigation}
+//               activeOpacity={0.8}
+//             >
+//               <Text style={styles.buttonText}>Navigate to Incident</Text>
+//             </TouchableOpacity>
+
+//             {assignedIncident.status?.driver !== 'completed' && (
+//               <TouchableOpacity
+//                 style={[styles.button, styles.completeButton]}
+//                 onPress={handleCompleteIncident}
+//                 activeOpacity={0.8}
+//               >
+//                 <Text style={styles.buttonText}>Mark as Completed</Text>
+//               </TouchableOpacity>
+//             )}
+//           </View>
+//         </>
+//       ) : (
+//         <>
+//           <TouchableOpacity
+//             activeOpacity={0.8}
+//             onPress={() => setShowDetailsModal(true)}
+//           >
+//             <View style={styles.incidentContainer}>
+//               <Text style={styles.incidentType}>{assignedIncident.incidentType}</Text>
+//               <Text style={styles.description}>{assignedIncident.description}</Text>
+//               <Text style={styles.address}>{assignedIncident.address}</Text>
+//               <Text style={styles.time}>
+//                 Reported: {new Date(assignedIncident.createdAt).toLocaleString()}
+//               </Text>
+//             </View>
+//           </TouchableOpacity>
+//           <Modal
+//             visible={showDetailsModal}
+//             transparent
+//             animationType="slide"
+//             onRequestClose={() => setShowDetailsModal(false)}
+//           >
+//             <View style={styles.detailsModalOverlay}>
+//               <View style={styles.detailsModalContent}>
+//                 <Text style={styles.detailsModalTitle}>🚨 Incident Details</Text>
+
+//                 {assignedIncident && (
+//                   <>
+//                     <Text style={styles.detailsModalText}>
+//                       🧾 {assignedIncident.incidentType || "Unknown Type"}
+//                     </Text>
+
+//                     <Text style={styles.detailsModalText}>
+//                       📝 {assignedIncident.description || "No description"}
+//                     </Text>
+
+//                     <Text style={styles.detailsModalText}>
+//                       📍 {assignedIncident.address || "No address"}
+//                     </Text>
+
+//                     <Text style={styles.detailsModalText}>
+//                       🕒 Reported At: {new Date(assignedIncident.createdAt).toLocaleString()}
+//                     </Text>
+
+//                     <View style={styles.detailsModalButtons}>
+//                       <TouchableOpacity
+//                         style={[styles.detailsModalButton, styles.detailsModalCancelButton]}
+//                         onPress={() => setShowDetailsModal(false)}
+//                         activeOpacity={0.7}
+//                       >
+//                         <Text style={styles.detailsModalButtonText}>Close</Text>
+//                       </TouchableOpacity>
+//                     </View>
+//                   </>
+//                 )}
+//               </View>
+//             </View>
+//           </Modal>
+
+//           {driverLocation && assignedIncident.latitude && assignedIncident.longitude && (
+//             <View style={styles.mapContainer}>
+//               <MapView
+//                 style={styles.map}
+//                 initialRegion={{
+//                   latitude: driverLocation.latitude,
+//                   longitude: driverLocation.longitude,
+//                   latitudeDelta: 0.06,
+//                   longitudeDelta: 0.03,
+//                 }}
+//               >
+//                 <Marker
+//                   coordinate={{
+//                     latitude: driverLocation.latitude,
+//                     longitude: driverLocation.longitude,
+//                   }}
+//                   title="Your Location"
+//                   pinColor="blue"
+//                 />
+//                 <Marker
+//                   coordinate={{
+//                     latitude: assignedIncident.latitude,
+//                     longitude: assignedIncident.longitude,
+//                   }}
+//                   title="Incident Location"
+//                   pinColor="red"
+//                 />
+//               </MapView>
+//             </View>
+//           )}
+
+//           <View style={styles.buttonContainer}>
+//             <TouchableOpacity
+//               style={[styles.button, loading ? styles.disabledButton : styles.acceptButton]}
+//               onPress={() => setShowAcceptModal(true)}
+//               disabled={loading}
+//               activeOpacity={0.7}
+//             >
+//               {loading ? (
+//                 <ActivityIndicator color="#fff" />
+//               ) : (
+//                 <Text style={styles.buttonText}>Accept Incident</Text>
+//               )}
+//             </TouchableOpacity>
+//           </View>
+//         </>
+//       )}
+
+//       <Modal visible={showAcceptModal} transparent animationType="slide">
+//         <View style={styles.modalContainer}>
+//           <View style={styles.modalContent}>
+//             <Text style={styles.modalTitle}>Confirm Acceptance</Text>
+//             <Text style={styles.modalText}>
+//               Are you sure you want to accept this incident?
+//             </Text>
+//             {assignedIncident && (
+//               <>
+//                 <Text style={styles.modalIncidentType}>{assignedIncident.incidentType}</Text>
+//                 <Text style={styles.modalAddress}>{assignedIncident.address}</Text>
+//               </>
+//             )}
+//             <View style={styles.modalButtons}>
+//               <TouchableOpacity
+//                 style={[styles.modalButton, styles.modalCancelButton]}
+//                 onPress={() => setShowAcceptModal(false)}
+//                 disabled={loading}
+//                 activeOpacity={0.7}
+//               >
+//                 <Text style={styles.modalButtonText}>Cancel</Text>
+//               </TouchableOpacity>
+//               <TouchableOpacity
+//                 style={[styles.modalButton, loading ? styles.disabledModalButton : styles.modalAcceptButton]}
+//                 onPress={handleAcceptIncident}
+//                 disabled={loading}
+//                 activeOpacity={0.7}
+//               >
+//                 <Text style={styles.modalButtonText}>
+//                   {loading ? 'Accepting...' : 'Accept'}
+//                 </Text>
+//               </TouchableOpacity>
+//             </View>
+//           </View>
+//         </View>
+//       </Modal>
+//     </ScrollView>
+//   );
+// };
+
+import React, { useState, useEffect, useLayoutEffect } from "react";
 import {
   View,
   Text,
@@ -775,98 +1398,196 @@ import {
   ActivityIndicator,
   Alert,
   Modal,
-  StatusBar
-} from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { db, auth } from '../firebase/firebaseConnection';
+  StatusBar,
+  RefreshControl,
+} from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
+import { db, auth } from "../firebase/firebaseConnection";
 import app from "../firebase/firebaseConnection";
 import { getAuth, signOut } from "firebase/auth";
-import { doc, updateDoc, onSnapshot, collection, query, where, getDocs, getDoc } from 'firebase/firestore';
-import MapView, { Marker } from 'react-native-maps';
-import { MaterialIcons, FontAwesome5 } from '@expo/vector-icons';
-import * as Location from 'expo-location';
+import {
+  doc,
+  updateDoc,
+  onSnapshot,
+  collection,
+  query,
+  where,
+  getDocs,
+  getDoc,
+} from "firebase/firestore";
+import MapView, { Marker } from "react-native-maps";
+import { MaterialIcons, FontAwesome5 } from "@expo/vector-icons";
+import * as Location from "expo-location";
 
 const DriverScreen = ({ navigation }) => {
   const [assignedIncident, setAssignedIncident] = useState(null);
   const [driverLocation, setDriverLocation] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [showAcceptModal, setShowAcceptModal] = useState(false);
   const [showNavigation, setShowNavigation] = useState(false);
   const [showHospitalNavigation, setShowHospitalNavigation] = useState(false);
   const [driverData, setDriverData] = useState({
-    name: '',
-    vehicleNumber: '',
-    contact: '',
-    email: ''
+    name: "",
+    vehicleNumber: "",
+    contact: "",
+    email: "",
   });
   const [showDetailsModal, setShowDetailsModal] = useState(false);
 
-  useEffect(() => {
-    const user = auth.currentUser;
-    if (!user) {
-      Alert.alert('Error', 'Driver not authenticated');
-      navigation.navigate('Login');
-      return;
-    }
+  const fetchAssignedIncidents = async () => {
+    try {
+      const user = auth.currentUser;
+      if (!user) {
+        Alert.alert("Error", "Driver not authenticated");
+        navigation.navigate("Login");
+        return;
+      }
 
+      const incidentsRef = collection(db, "incidents");
+      const q = query(
+        incidentsRef,
+        where("assignedTo", "==", user.uid),
+        where("status.hospital", "!=", "completed")
+      );
+
+      const snapshot = await getDocs(q);
+      if (!snapshot.empty) {
+        const incidentDoc = snapshot.docs[0];
+        const incidentData = incidentDoc.data();
+        const newIncident = {
+          id: incidentDoc.id,
+          ...incidentData,
+        };
+        setAssignedIncident(newIncident);
+
+        if (
+          incidentData.status?.driver === "completed" &&
+          incidentData.status?.hospital === "accepted"
+        ) {
+          setShowNavigation(false);
+          setShowHospitalNavigation(true);
+        } else if (incidentData.status?.driver === "accepted") {
+          setShowNavigation(true);
+          setShowHospitalNavigation(false);
+        } else {
+          setShowNavigation(false);
+          setShowHospitalNavigation(false);
+        }
+      } else {
+        const availableIncidentsQuery = query(
+          incidentsRef,
+          where("status.driver", "==", "assigned"),
+          where("availableToAllDrivers", "==", true)
+        );
+
+        const availableSnapshot = await getDocs(availableIncidentsQuery);
+        if (!availableSnapshot.empty) {
+          const incidentDoc = availableSnapshot.docs[0];
+          const incidentData = incidentDoc.data();
+          setAssignedIncident({
+            id: incidentDoc.id,
+            ...incidentData,
+          });
+          setShowNavigation(false);
+          setShowHospitalNavigation(false);
+        } else {
+          setAssignedIncident(null);
+          setShowNavigation(false);
+          setShowHospitalNavigation(false);
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching incidents:", error);
+      throw error;
+    }
+  };
+
+  const fetchAndStoreLocation = async () => {
+    try {
+      let { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert(
+          "Permission Denied",
+          "Allow location access to use this feature."
+        );
+        return;
+      }
+
+      let location = await Location.getCurrentPositionAsync({});
+      const userDoc = await getDoc(doc(db, "users", auth.currentUser.uid));
+      const ambulanceDoc = await getDoc(
+        doc(db, "ambulances", auth.currentUser.uid)
+      );
+      const { latitude, longitude } = location.coords;
+
+      if (userDoc.exists() && ambulanceDoc.exists()) {
+        const userData = userDoc.data();
+        const ambulanceData = ambulanceDoc.data();
+
+        setDriverData({
+          name: userData.name || "Driver",
+          vehicleNumber: ambulanceData.vehicleNumber || "Unknown",
+          contact: ambulanceData.contact || "N/A",
+          email: userData.email,
+        });
+      } else {
+        Alert.alert("Error", "Driver profile not complete");
+      }
+
+      const driverRef = doc(db, "ambulances", auth.currentUser.uid);
+      await updateDoc(driverRef, {
+        latitude,
+        longitude,
+        timestamp: new Date().toISOString(),
+      });
+
+      setDriverLocation({
+        latitude,
+        longitude,
+        driverId: auth.currentUser.uid,
+      });
+    } catch (error) {
+      console.error("Location update error:", error);
+    }
+  };
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await fetchAndStoreLocation();
+      await fetchAssignedIncidents();
+    } catch (error) {
+      console.error("Error refreshing:", error);
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
     let interval = null;
     let unsubscribe = null;
 
-    const fetchAndStoreLocation = async () => {
-      try {
-        let { status } = await Location.requestForegroundPermissionsAsync();
-        if (status !== 'granted') {
-          Alert.alert('Permission Denied', 'Allow location access to use this feature.');
-          return;
-        }
-
-        let location = await Location.getCurrentPositionAsync({});
-        const userDoc = await getDoc(doc(db, 'users', user.uid));
-        const ambulanceDoc = await getDoc(doc(db, 'ambulances', user.uid));
-        const { latitude, longitude } = location.coords;
-
-        if (userDoc.exists() && ambulanceDoc.exists()) {
-          const userData = userDoc.data();
-          const ambulanceData = ambulanceDoc.data();
-
-          setDriverData({
-            name: userData.name || 'Driver',
-            vehicleNumber: ambulanceData.vehicleNumber || 'Unknown',
-            contact: ambulanceData.contact || 'N/A',
-            email: userData.email
-          });
-        } else {
-          Alert.alert('Error', 'Driver profile not complete');
-        }
-
-        const driverRef = doc(db, 'ambulances', auth.currentUser.uid);
-        await updateDoc(driverRef, {
-          latitude,
-          longitude,
-          timestamp: new Date().toISOString(),
-        });
-
-        setDriverLocation({
-          latitude,
-          longitude,
-          driverId: auth.currentUser.uid,
-        });
-      } catch (error) {
-        console.error('Location update error:', error);
-      }
+    const initialize = async () => {
+      await fetchAndStoreLocation();
+      await fetchAssignedIncidents();
+      setLoading(false);
     };
 
+    initialize();
+
+    // Update location every 20 seconds
     interval = setInterval(fetchAndStoreLocation, 20000);
-    fetchAndStoreLocation(); // Initial fetch
 
-    const fetchAssignedIncidents = () => {
-      const incidentsRef = collection(db, 'incidents');
+    // Set up real-time listener for incidents
+    const incidentsRef = collection(db, "incidents");
+    const user = auth.currentUser;
 
-      // Query for incidents assigned to this driver where hospital is not completed
+    if (user) {
       const q = query(
         incidentsRef,
-        where('assignedTo', '==', user.uid),
-        where('status.hospital', '!=', 'completed')
+        where("assignedTo", "==", user.uid),
+        where("status.hospital", "!=", "completed")
       );
 
       unsubscribe = onSnapshot(q, (snapshot) => {
@@ -875,54 +1596,30 @@ const DriverScreen = ({ navigation }) => {
           const incidentData = incidentDoc.data();
           const newIncident = {
             id: incidentDoc.id,
-            ...incidentData
+            ...incidentData,
           };
           setAssignedIncident(newIncident);
 
-          // Determine which screen to show based on incident status
-          if (incidentData.status?.driver === 'completed' && incidentData.status?.hospital === 'accepted') {
-            // Show hospital navigation if driver completed but hospital not completed
+          if (
+            incidentData.status?.driver === "completed" &&
+            incidentData.status?.hospital === "accepted"
+          ) {
             setShowNavigation(false);
             setShowHospitalNavigation(true);
-          } else if (incidentData.status?.driver === 'accepted') {
-            // Show incident navigation if driver accepted but not completed
+          } else if (incidentData.status?.driver === "accepted") {
             setShowNavigation(true);
             setShowHospitalNavigation(false);
           } else {
-            // Show accept screen for new assignments
             setShowNavigation(false);
             setShowHospitalNavigation(false);
           }
         } else {
-          // Check for new available incidents if no assigned incidents
-          const availableIncidentsQuery = query(
-            incidentsRef,
-            where('status.driver', '==', 'assigned'),
-            where('availableToAllDrivers', '==', true)
-          );
-          
-          getDocs(availableIncidentsQuery).then((availableSnapshot) => {
-            if (!availableSnapshot.empty) {
-              const incidentDoc = availableSnapshot.docs[0];
-              const incidentData = incidentDoc.data();
-              setAssignedIncident({
-                id: incidentDoc.id,
-                ...incidentData
-              });
-              setShowNavigation(false);
-              setShowHospitalNavigation(false);
-            } else {
-              setAssignedIncident(null);
-              setShowNavigation(false);
-              setShowHospitalNavigation(false);
-            }
-          });
+          setAssignedIncident(null);
+          setShowNavigation(false);
+          setShowHospitalNavigation(false);
         }
-        setLoading(false);
       });
-    };
-
-    fetchAssignedIncidents();
+    }
 
     return () => {
       if (interval) clearInterval(interval);
@@ -953,7 +1650,7 @@ const DriverScreen = ({ navigation }) => {
 
   const handleAcceptIncident = async () => {
     if (!auth.currentUser?.uid || !driverData.name) {
-      Alert.alert('Error', 'Driver information incomplete');
+      Alert.alert("Error", "Driver information incomplete");
       return;
     }
 
@@ -964,88 +1661,104 @@ const DriverScreen = ({ navigation }) => {
         name: driverData.name,
         vehicleNumber: driverData.vehicleNumber,
         contact: driverData.contact,
-        email: driverData.email
+        email: driverData.email,
       };
 
-      const incidentRef = doc(db, 'incidents', assignedIncident.id);
+      const incidentRef = doc(db, "incidents", assignedIncident.id);
       await updateDoc(incidentRef, {
-        'status.driver': 'accepted',
+        "status.driver": "accepted",
         assignedTo: auth.currentUser.uid,
         acceptedAt: new Date().toISOString(),
         driverInfo: driverInfo,
-        availableToAllDrivers: false
+        availableToAllDrivers: false,
       });
 
-      await updateDoc(doc(db, 'ambulances', auth.currentUser.uid), {
-        status: 'busy',
-        lastUpdated: new Date().toISOString()
+      await updateDoc(doc(db, "ambulances", auth.currentUser.uid), {
+        status: "busy",
+        lastUpdated: new Date().toISOString(),
       });
 
       setShowAcceptModal(false);
       setShowNavigation(true);
     } catch (error) {
-      console.error('Error accepting incident:', error);
-      Alert.alert('Error', 'Failed to accept incident');
+      console.error("Error accepting incident:", error);
+      Alert.alert("Error", "Failed to accept incident");
     } finally {
       setLoading(false);
     }
   };
 
   const handleStartNavigation = () => {
-    if (!driverLocation || !driverLocation.latitude || !driverLocation.longitude) {
-      Alert.alert('Error', 'Driver location data not available');
+    if (
+      !driverLocation ||
+      !driverLocation.latitude ||
+      !driverLocation.longitude
+    ) {
+      Alert.alert("Error", "Driver location data not available");
       return;
     }
 
-    if (!assignedIncident || !assignedIncident.latitude || !assignedIncident.longitude) {
-      Alert.alert('Error', 'Incident location data not available');
+    if (
+      !assignedIncident ||
+      !assignedIncident.latitude ||
+      !assignedIncident.longitude
+    ) {
+      Alert.alert("Error", "Incident location data not available");
       return;
     }
 
-    navigation.navigate('DriverNavigation', {
+    navigation.navigate("DriverNavigation", {
       driverLocation: {
         latitude: driverLocation.latitude,
         longitude: driverLocation.longitude,
-        driverId: driverLocation.driverId
+        driverId: driverLocation.driverId,
       },
       destinationLocation: {
         latitude: assignedIncident.latitude,
         longitude: assignedIncident.longitude,
         address: assignedIncident.address,
-        type: 'incident'
+        type: "incident",
       },
       incidentType: assignedIncident.incidentType,
       incidentId: assignedIncident.id,
-      isHospitalNavigation: false
+      isHospitalNavigation: false,
     });
   };
 
   const handleStartHospitalNavigation = () => {
-    if (!driverLocation || !driverLocation.latitude || !driverLocation.longitude) {
-      Alert.alert('Error', 'Driver location data not available');
+    if (
+      !driverLocation ||
+      !driverLocation.latitude ||
+      !driverLocation.longitude
+    ) {
+      Alert.alert("Error", "Driver location data not available");
       return;
     }
 
-    if (!assignedIncident.hospitalInfo || !assignedIncident.hospitalInfo.latitude || !assignedIncident.hospitalInfo.longitude) {
-      Alert.alert('Error', 'Hospital location data not available');
+    if (
+      !assignedIncident.hospitalInfo ||
+      !assignedIncident.hospitalInfo.latitude ||
+      !assignedIncident.hospitalInfo.longitude
+    ) {
+      Alert.alert("Error", "Hospital location data not available");
       return;
     }
 
-    navigation.navigate('DriverNavigation', {
+    navigation.navigate("DriverNavigation", {
       driverLocation: {
         latitude: driverLocation.latitude,
         longitude: driverLocation.longitude,
-        driverId: driverLocation.driverId
+        driverId: driverLocation.driverId,
       },
       destinationLocation: {
         latitude: assignedIncident.hospitalInfo.latitude,
         longitude: assignedIncident.hospitalInfo.longitude,
         address: assignedIncident.hospitalInfo.address,
-        type: 'hospital'
+        type: "hospital",
       },
       incidentType: assignedIncident.incidentType,
       incidentId: assignedIncident.id,
-      isHospitalNavigation: true
+      isHospitalNavigation: true,
     });
   };
 
@@ -1053,38 +1766,37 @@ const DriverScreen = ({ navigation }) => {
     try {
       setLoading(true);
 
-      const incidentRef = doc(db, 'incidents', assignedIncident.id);
+      const incidentRef = doc(db, "incidents", assignedIncident.id);
       await updateDoc(incidentRef, {
-        'status.driver': 'completed',
-        completedAt: new Date().toISOString()
+        "status.driver": "completed",
+        completedAt: new Date().toISOString(),
       });
 
-      await updateDoc(doc(db, 'ambulances', auth.currentUser.uid), {
-        status: 'available',
-        lastUpdated: new Date().toISOString()
+      await updateDoc(doc(db, "ambulances", auth.currentUser.uid), {
+        status: "available",
+        lastUpdated: new Date().toISOString(),
       });
 
-      // Navigate to the HospitalSelectionScreen with incident details
-      navigation.navigate('HospitalSelection', {
+      navigation.navigate("HospitalSelection", {
         incidentId: assignedIncident.id,
         incidentDetails: {
           type: assignedIncident.incidentType,
           description: assignedIncident.description,
           address: assignedIncident.address,
-          patientInfo: assignedIncident.patientInfo || {}
+          patientInfo: assignedIncident.patientInfo || {},
         },
         driverLocation: {
           latitude: driverLocation.latitude,
           longitude: driverLocation.longitude,
-          driverId: driverLocation.driverId
-        }
+          driverId: driverLocation.driverId,
+        },
       });
 
       setAssignedIncident(null);
       setShowNavigation(false);
     } catch (error) {
-      console.error('Error completing incident:', error);
-      Alert.alert('Error', 'Failed to complete incident');
+      console.error("Error completing incident:", error);
+      Alert.alert("Error", "Failed to complete incident");
     } finally {
       setLoading(false);
     }
@@ -1094,29 +1806,29 @@ const DriverScreen = ({ navigation }) => {
     try {
       setLoading(true);
 
-      const incidentRef = doc(db, 'incidents', assignedIncident.id);
+      const incidentRef = doc(db, "incidents", assignedIncident.id);
       await updateDoc(incidentRef, {
-        'status.hospital': 'completed',
-        hospitalCompletedAt: new Date().toISOString()
+        "status.hospital": "completed",
+        hospitalCompletedAt: new Date().toISOString(),
       });
 
-      await updateDoc(doc(db, 'ambulances', auth.currentUser.uid), {
-        status: 'available',
-        lastUpdated: new Date().toISOString()
+      await updateDoc(doc(db, "ambulances", auth.currentUser.uid), {
+        status: "available",
+        lastUpdated: new Date().toISOString(),
       });
 
       setAssignedIncident(null);
       setShowHospitalNavigation(false);
-      Alert.alert('Success', 'Hospital trip completed successfully');
+      Alert.alert("Success", "Hospital trip completed successfully");
     } catch (error) {
-      console.error('Error completing hospital trip:', error);
-      Alert.alert('Error', 'Failed to complete hospital trip');
+      console.error("Error completing hospital trip:", error);
+      Alert.alert("Error", "Failed to complete hospital trip");
     } finally {
       setLoading(false);
     }
   };
 
-  if (loading) {
+  if (loading && !refreshing) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#4285F4" />
@@ -1126,52 +1838,68 @@ const DriverScreen = ({ navigation }) => {
   }
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#3b5998"/>
+    <ScrollView
+      contentContainerStyle={styles.container}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          colors={["#4285F4"]}
+          tintColor="#4285F4"
+        />
+      }
+    >
+      <StatusBar barStyle="light-content" backgroundColor="#3b5998" />
       {!assignedIncident ? (
         <View style={styles.emptyState}>
           <MaterialIcons name="assignment" size={60} color="#bbb" />
           <Text style={styles.noDataText}>No assigned incidents</Text>
-          <Text style={styles.subText}>Waiting for new assignments...</Text>
+          <Text style={styles.subText}>Pull down to refresh</Text>
         </View>
       ) : showHospitalNavigation ? (
         <>
           <View style={styles.navigationContainer}>
             <Text style={styles.navigationTitle}>Hospital Trip</Text>
             <Text style={styles.navigationText}>Transporting patient to:</Text>
-            <Text style={styles.hospitalName}>{assignedIncident.hospitalInfo?.name}</Text>
-            <Text style={styles.address}>{assignedIncident.hospitalInfo?.address}</Text>
+            <Text style={styles.hospitalName}>
+              {assignedIncident.hospitalInfo?.name}
+            </Text>
+            <Text style={styles.address}>
+              {assignedIncident.hospitalInfo?.address}
+            </Text>
 
-            {driverLocation && assignedIncident.hospitalInfo?.latitude && assignedIncident.hospitalInfo?.longitude && (
-              <View style={styles.mapContainer}>
-                <MapView
-                  style={styles.map}
-                  initialRegion={{
-                    latitude: driverLocation.latitude,
-                    longitude: driverLocation.longitude,
-                    latitudeDelta: 0.06,
-                    longitudeDelta: 0.03,
-                  }}
-                >
-                  <Marker
-                    coordinate={{
+            {driverLocation &&
+              assignedIncident.hospitalInfo?.latitude &&
+              assignedIncident.hospitalInfo?.longitude && (
+                <View style={styles.mapContainer}>
+                  <MapView
+                    style={styles.map}
+                    initialRegion={{
                       latitude: driverLocation.latitude,
                       longitude: driverLocation.longitude,
+                      latitudeDelta: 0.06,
+                      longitudeDelta: 0.03,
                     }}
-                    title="Your Location"
-                    pinColor="blue"
-                  />
-                  <Marker
-                    coordinate={{
-                      latitude: assignedIncident.hospitalInfo.latitude,
-                      longitude: assignedIncident.hospitalInfo.longitude,
-                    }}
-                    title="Hospital Location"
-                    pinColor="green"
-                  />
-                </MapView>
-              </View>
-            )}
+                  >
+                    <Marker
+                      coordinate={{
+                        latitude: driverLocation.latitude,
+                        longitude: driverLocation.longitude,
+                      }}
+                      title="Your Location"
+                      pinColor="blue"
+                    />
+                    <Marker
+                      coordinate={{
+                        latitude: assignedIncident.hospitalInfo.latitude,
+                        longitude: assignedIncident.hospitalInfo.longitude,
+                      }}
+                      title="Hospital Location"
+                      pinColor="green"
+                    />
+                  </MapView>
+                </View>
+              )}
 
             <TouchableOpacity
               style={[styles.button, styles.navigateButton]}
@@ -1194,10 +1922,135 @@ const DriverScreen = ({ navigation }) => {
         <>
           <View style={styles.navigationContainer}>
             <Text style={styles.navigationTitle}>Active Incident</Text>
-            <Text style={styles.navigationText}>{assignedIncident.incidentType}</Text>
+            <Text style={styles.navigationText}>
+              {assignedIncident.incidentType}
+            </Text>
             <Text style={styles.address}>{assignedIncident.address}</Text>
 
-            {driverLocation && assignedIncident.latitude && assignedIncident.longitude && (
+            {driverLocation &&
+              assignedIncident.latitude &&
+              assignedIncident.longitude && (
+                <View style={styles.mapContainer}>
+                  <MapView
+                    style={styles.map}
+                    initialRegion={{
+                      latitude: driverLocation.latitude,
+                      longitude: driverLocation.longitude,
+                      latitudeDelta: 0.06,
+                      longitudeDelta: 0.03,
+                    }}
+                  >
+                    <Marker
+                      coordinate={{
+                        latitude: driverLocation.latitude,
+                        longitude: driverLocation.longitude,
+                      }}
+                      title="Your Location"
+                      pinColor="blue"
+                    />
+                    <Marker
+                      coordinate={{
+                        latitude: assignedIncident.latitude,
+                        longitude: assignedIncident.longitude,
+                      }}
+                      title="Incident Location"
+                      pinColor="red"
+                    />
+                  </MapView>
+                </View>
+              )}
+
+            <TouchableOpacity
+              style={[styles.button, styles.navigateButton]}
+              onPress={handleStartNavigation}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.buttonText}>Navigate to Incident</Text>
+            </TouchableOpacity>
+
+            {assignedIncident.status?.driver !== "completed" && (
+              <TouchableOpacity
+                style={[styles.button, styles.completeButton]}
+                onPress={handleCompleteIncident}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.buttonText}>Mark as Completed</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </>
+      ) : (
+        <>
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={() => setShowDetailsModal(true)}
+          >
+            <View style={styles.incidentContainer}>
+              <Text style={styles.incidentType}>
+                {assignedIncident.incidentType}
+              </Text>
+              <Text style={styles.description}>
+                {assignedIncident.description}
+              </Text>
+              <Text style={styles.address}>{assignedIncident.address}</Text>
+              <Text style={styles.time}>
+                Reported:{" "}
+                {new Date(assignedIncident.createdAt).toLocaleString()}
+              </Text>
+            </View>
+          </TouchableOpacity>
+          <Modal
+            visible={showDetailsModal}
+            transparent
+            animationType="slide"
+            onRequestClose={() => setShowDetailsModal(false)}
+          >
+            <View style={styles.detailsModalOverlay}>
+              <View style={styles.detailsModalContent}>
+                <Text style={styles.detailsModalTitle}>
+                  🚨 Incident Details
+                </Text>
+
+                {assignedIncident && (
+                  <>
+                    <Text style={styles.detailsModalText}>
+                      🧾 {assignedIncident.incidentType || "Unknown Type"}
+                    </Text>
+
+                    <Text style={styles.detailsModalText}>
+                      📝 {assignedIncident.description || "No description"}
+                    </Text>
+
+                    <Text style={styles.detailsModalText}>
+                      📍 {assignedIncident.address || "No address"}
+                    </Text>
+
+                    <Text style={styles.detailsModalText}>
+                      🕒 Reported At:{" "}
+                      {new Date(assignedIncident.createdAt).toLocaleString()}
+                    </Text>
+
+                    <View style={styles.detailsModalButtons}>
+                      <TouchableOpacity
+                        style={[
+                          styles.detailsModalButton,
+                          styles.detailsModalCancelButton,
+                        ]}
+                        onPress={() => setShowDetailsModal(false)}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={styles.detailsModalButtonText}>Close</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </>
+                )}
+              </View>
+            </View>
+          </Modal>
+
+          {driverLocation &&
+            assignedIncident.latitude &&
+            assignedIncident.longitude && (
               <View style={styles.mapContainer}>
                 <MapView
                   style={styles.map}
@@ -1228,117 +2081,12 @@ const DriverScreen = ({ navigation }) => {
               </View>
             )}
 
-            <TouchableOpacity
-              style={[styles.button, styles.navigateButton]}
-              onPress={handleStartNavigation}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.buttonText}>Navigate to Incident</Text>
-            </TouchableOpacity>
-
-            {assignedIncident.status?.driver !== 'completed' && (
-              <TouchableOpacity
-                style={[styles.button, styles.completeButton]}
-                onPress={handleCompleteIncident}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.buttonText}>Mark as Completed</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        </>
-      ) : (
-        <>
-          <TouchableOpacity
-            activeOpacity={0.8}
-            onPress={() => setShowDetailsModal(true)}
-          >
-            <View style={styles.incidentContainer}>
-              <Text style={styles.incidentType}>{assignedIncident.incidentType}</Text>
-              <Text style={styles.description}>{assignedIncident.description}</Text>
-              <Text style={styles.address}>{assignedIncident.address}</Text>
-              <Text style={styles.time}>
-                Reported: {new Date(assignedIncident.createdAt).toLocaleString()}
-              </Text>
-            </View>
-          </TouchableOpacity>
-          <Modal
-            visible={showDetailsModal}
-            transparent
-            animationType="slide"
-            onRequestClose={() => setShowDetailsModal(false)}
-          >
-            <View style={styles.detailsModalOverlay}>
-              <View style={styles.detailsModalContent}>
-                <Text style={styles.detailsModalTitle}>🚨 Incident Details</Text>
-
-                {assignedIncident && (
-                  <>
-                    <Text style={styles.detailsModalText}>
-                      🧾 {assignedIncident.incidentType || "Unknown Type"}
-                    </Text>
-
-                    <Text style={styles.detailsModalText}>
-                      📝 {assignedIncident.description || "No description"}
-                    </Text>
-
-                    <Text style={styles.detailsModalText}>
-                      📍 {assignedIncident.address || "No address"}
-                    </Text>
-
-                    <Text style={styles.detailsModalText}>
-                      🕒 Reported At: {new Date(assignedIncident.createdAt).toLocaleString()}
-                    </Text>
-
-                    <View style={styles.detailsModalButtons}>
-                      <TouchableOpacity
-                        style={[styles.detailsModalButton, styles.detailsModalCancelButton]}
-                        onPress={() => setShowDetailsModal(false)}
-                        activeOpacity={0.7}
-                      >
-                        <Text style={styles.detailsModalButtonText}>Close</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </>
-                )}
-              </View>
-            </View>
-          </Modal>
-
-          {driverLocation && assignedIncident.latitude && assignedIncident.longitude && (
-            <View style={styles.mapContainer}>
-              <MapView
-                style={styles.map}
-                initialRegion={{
-                  latitude: driverLocation.latitude,
-                  longitude: driverLocation.longitude,
-                  latitudeDelta: 0.06,
-                  longitudeDelta: 0.03,
-                }}
-              >
-                <Marker
-                  coordinate={{
-                    latitude: driverLocation.latitude,
-                    longitude: driverLocation.longitude,
-                  }}
-                  title="Your Location"
-                  pinColor="blue"
-                />
-                <Marker
-                  coordinate={{
-                    latitude: assignedIncident.latitude,
-                    longitude: assignedIncident.longitude,
-                  }}
-                  title="Incident Location"
-                  pinColor="red"
-                />
-              </MapView>
-            </View>
-          )}
-
           <View style={styles.buttonContainer}>
             <TouchableOpacity
-              style={[styles.button, loading ? styles.disabledButton : styles.acceptButton]}
+              style={[
+                styles.button,
+                loading ? styles.disabledButton : styles.acceptButton,
+              ]}
               onPress={() => setShowAcceptModal(true)}
               disabled={loading}
               activeOpacity={0.7}
@@ -1362,8 +2110,12 @@ const DriverScreen = ({ navigation }) => {
             </Text>
             {assignedIncident && (
               <>
-                <Text style={styles.modalIncidentType}>{assignedIncident.incidentType}</Text>
-                <Text style={styles.modalAddress}>{assignedIncident.address}</Text>
+                <Text style={styles.modalIncidentType}>
+                  {assignedIncident.incidentType}
+                </Text>
+                <Text style={styles.modalAddress}>
+                  {assignedIncident.address}
+                </Text>
               </>
             )}
             <View style={styles.modalButtons}>
@@ -1376,13 +2128,18 @@ const DriverScreen = ({ navigation }) => {
                 <Text style={styles.modalButtonText}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.modalButton, loading ? styles.disabledModalButton : styles.modalAcceptButton]}
+                style={[
+                  styles.modalButton,
+                  loading
+                    ? styles.disabledModalButton
+                    : styles.modalAcceptButton,
+                ]}
                 onPress={handleAcceptIncident}
                 disabled={loading}
                 activeOpacity={0.7}
               >
                 <Text style={styles.modalButtonText}>
-                  {loading ? 'Accepting...' : 'Accept'}
+                  {loading ? "Accepting..." : "Accept"}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -1396,44 +2153,44 @@ const DriverScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     padding: 20,
-    backgroundColor: '#f5f7fa',
+    backgroundColor: "#f5f7fa",
     flexGrow: 1,
   },
   loadingContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#f5f7fa',
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#f5f7fa",
   },
   loadingText: {
     marginTop: 15,
     fontSize: 16,
-    color: '#555',
+    color: "#555",
   },
   emptyState: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     marginTop: 80,
   },
   noDataText: {
     marginTop: 15,
     fontSize: 20,
-    fontWeight: '600',
-    color: '#555',
+    fontWeight: "600",
+    color: "#555",
   },
   subText: {
     marginTop: 5,
     fontSize: 14,
-    color: '#888',
-    fontStyle: 'italic',
+    color: "#888",
+    fontStyle: "italic",
   },
   incidentContainer: {
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     borderRadius: 12,
     padding: 20,
     marginBottom: 15,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOpacity: 0.1,
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 5 },
@@ -1441,40 +2198,40 @@ const styles = StyleSheet.create({
   },
   incidentType: {
     fontSize: 22,
-    fontWeight: '700',
+    fontWeight: "700",
     marginBottom: 6,
-    color: '#222',
+    color: "#222",
   },
   description: {
     fontSize: 16,
-    color: '#444',
+    color: "#444",
     marginBottom: 8,
     lineHeight: 22,
   },
   address: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#666',
+    fontWeight: "600",
+    color: "#666",
     marginBottom: 6,
   },
   hospitalName: {
     fontSize: 18,
-    fontWeight: '700',
-    color: '#333',
+    fontWeight: "700",
+    color: "#333",
     marginBottom: 6,
   },
   time: {
     fontSize: 12,
-    color: '#999',
+    color: "#999",
   },
   mapContainer: {
     height: 220,
     borderRadius: 12,
-    overflow: 'hidden',
+    overflow: "hidden",
     marginVertical: 15,
     borderWidth: 1,
-    borderColor: '#ddd',
-    shadowColor: '#000',
+    borderColor: "#ddd",
+    shadowColor: "#000",
     shadowOpacity: 0.12,
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 4 },
@@ -1485,38 +2242,38 @@ const styles = StyleSheet.create({
   },
   buttonContainer: {
     marginTop: 10,
-    alignItems: 'center',
+    alignItems: "center",
   },
   button: {
-    width: '80%',
+    width: "80%",
     paddingVertical: 14,
     borderRadius: 30,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     marginBottom: 10,
   },
   acceptButton: {
-    backgroundColor: '#28a745',
+    backgroundColor: "#28a745",
   },
   navigateButton: {
-    backgroundColor: '#007bff',
+    backgroundColor: "#007bff",
   },
   completeButton: {
-    backgroundColor: '#dc3545',
+    backgroundColor: "#dc3545",
   },
   disabledButton: {
-    backgroundColor: '#a3a3a3',
+    backgroundColor: "#a3a3a3",
   },
   buttonText: {
-    color: '#fff',
-    fontWeight: '700',
+    color: "#fff",
+    fontWeight: "700",
     fontSize: 16,
   },
   navigationContainer: {
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     padding: 20,
     borderRadius: 12,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOpacity: 0.1,
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 5 },
@@ -1524,117 +2281,117 @@ const styles = StyleSheet.create({
   },
   navigationTitle: {
     fontSize: 20,
-    fontWeight: '700',
+    fontWeight: "700",
     marginBottom: 5,
-    color: '#222',
+    color: "#222",
   },
   navigationText: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: "600",
     marginBottom: 10,
-    color: '#444',
+    color: "#444",
   },
   modalContainer: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    justifyContent: 'center',
+    backgroundColor: "rgba(0,0,0,0.6)",
+    justifyContent: "center",
     paddingHorizontal: 25,
   },
   modalContent: {
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     borderRadius: 16,
     padding: 25,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOpacity: 0.2,
     shadowRadius: 15,
     shadowOffset: { width: 0, height: 10 },
   },
   modalTitle: {
     fontSize: 22,
-    fontWeight: '700',
+    fontWeight: "700",
     marginBottom: 12,
-    textAlign: 'center',
-    color: '#111',
+    textAlign: "center",
+    color: "#111",
   },
   modalText: {
     fontSize: 16,
     marginBottom: 20,
-    color: '#555',
-    textAlign: 'center',
+    color: "#555",
+    textAlign: "center",
   },
   modalIncidentType: {
     fontSize: 18,
-    fontWeight: '600',
-    textAlign: 'center',
+    fontWeight: "600",
+    textAlign: "center",
     marginBottom: 6,
-    color: '#222',
+    color: "#222",
   },
   modalAddress: {
     fontSize: 14,
-    fontWeight: '500',
-    color: '#666',
-    textAlign: 'center',
+    fontWeight: "500",
+    color: "#666",
+    textAlign: "center",
     marginBottom: 20,
   },
   modalButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
+    flexDirection: "row",
+    justifyContent: "space-around",
   },
   modalButton: {
     flex: 1,
     marginHorizontal: 10,
     paddingVertical: 14,
     borderRadius: 30,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   modalCancelButton: {
-    backgroundColor: '#bbb',
+    backgroundColor: "#bbb",
   },
   modalAcceptButton: {
-    backgroundColor: '#28a745',
+    backgroundColor: "#28a745",
   },
   disabledModalButton: {
-    backgroundColor: '#a3a3a3',
+    backgroundColor: "#a3a3a3",
   },
   modalButtonText: {
-    color: '#fff',
-    fontWeight: '700',
+    color: "#fff",
+    fontWeight: "700",
     fontSize: 16,
   },
   detailsModalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
   },
   detailsModalContent: {
-    width: '90%',
-    backgroundColor: '#fff',
+    width: "90%",
+    backgroundColor: "#fff",
     borderRadius: 20,
     padding: 20,
     elevation: 10,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.25,
     shadowRadius: 6,
   },
   detailsModalTitle: {
     fontSize: 22,
-    fontWeight: 'bold',
-    textAlign: 'center',
+    fontWeight: "bold",
+    textAlign: "center",
     marginBottom: 20,
-    color: '#e74c3c',
+    color: "#e74c3c",
   },
   detailsModalText: {
     fontSize: 16,
-    color: '#2c3e50',
+    color: "#2c3e50",
     marginBottom: 10,
     lineHeight: 22,
   },
   detailsModalButtons: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
+    flexDirection: "row",
+    justifyContent: "flex-end",
     marginTop: 20,
   },
   detailsModalButton: {
@@ -1643,12 +2400,12 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   detailsModalCancelButton: {
-    backgroundColor: '#e74c3c',
+    backgroundColor: "#e74c3c",
   },
   detailsModalButtonText: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: "600",
   },
 });
 
